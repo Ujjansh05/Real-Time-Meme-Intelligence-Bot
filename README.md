@@ -1,5 +1,6 @@
 
-# 🤖 Real-Time Meme Intelligence Bot
+# 🤖 Humour Hub
+<img width="858" height="852" alt="Gemini_Generated_Image_7lbzm37lbzm37lbz" src="https://github.com/user-attachments/assets/50f6e0e2-fd19-4645-9640-4b7f8bc7ac92" />
 
 A fun and innovative project built for the **Pathway X Iota Cluster IIT Ropar Gen AI Hackathon** 🎉
 
@@ -96,10 +97,6 @@ meme-intelligence-bot/
 │   ├── popup.js             # API calls to backend
 │   ├── background.js        # (Optional) context menu logic
 │   └── icon.png             # Extension icon
-│
-│── demo/
-│   ├── demo.gif             # Demo GIF for quick preview
-│   └── demo.mp4             # Demo video for hackathon submission
 │
 │── README.md                # Documentation
 ```
