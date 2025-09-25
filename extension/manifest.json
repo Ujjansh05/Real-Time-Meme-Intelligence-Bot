@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Meme Bot",
+  "version": "1.0",
+  "description": "Explains and remixes memes in real-time.",
+  "permissions": ["activeTab", "scripting", "contextMenus"],
+  "host_permissions": ["http://127.0.0.1:8000/"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
+    }
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Meme Bot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* New Light Blue Theme */
+      --primary-accent: #3498db;
+      --secondary-accent: #85c1e9;
+      --card-bg: rgba(255, 255, 255, 0.45);
+      --text-color: #2c3e50; /* Darker text */
+      --border-color: rgba(255, 255, 255, 0.7);
+      --placeholder-color: #7f8c8d;
+      --button-bg: rgba(255, 255, 255, 0.5);
+      --button-hover-bg: rgba(255, 255, 255, 0.8);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      width: 340px;
+      padding: 16px;
+      color: var(--text-color);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .background-animation {
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      z-index: -1;
+      /* Lightest blue animated gradient */
+      background: linear-gradient(
+        -45deg, 
+        #a1c4fd, 
+        #c2e9fb, 
+        #e0f7fa,
+        #a1c4fd
+      );
+      background-size: 400% 400%;
+      animation: gradientAnimation 20s ease infinite;
+    }
+
+    @keyframes gradientAnimation {
+      0% { transform: translate(0%, 0%); }
+      50% { transform: translate(10%, 5%); }
+      100% { transform: translate(0%, 0%); }
+    }
+    
+    .container {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Remove dark mode toggle as it's not needed for a single light theme */
+    .dark-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: flex-end;
+      margin-bottom: 4px;
+    }
+    .dark-toggle input[type="checkbox"] {
+      accent-color: var(--primary-accent);
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .dark-toggle label {
+      font-size: 14px;
+      color: var(--text-color);
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .header img {
+      width: 36px;
+      height: 36px;
+    }
+
+    .header h2 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-color);
+    }
+    
+    textarea#memeInput {
+      width: 100%;
+      height: 70px;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      resize: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      background-color: rgba(255, 255, 255, 0.2);
+      color: var(--text-color);
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    
+    textarea#memeInput::placeholder {
+      color: var(--placeholder-color);
+      opacity: 1;
+    }
+
+    textarea#memeInput:focus {
+      outline: none;
+      border-color: var(--primary-accent);
+      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.4);
+    }
+    
+    .button-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    button {
+      padding: 12px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background-color: var(--button-bg);
+      color: var(--text-color);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      background-color: var(--button-hover-bg);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    button:active {
+      transform: translateY(0);
+      filter: brightness(0.95);
+    }
+    
+    button.primary {
+      grid-column: 1 / -1; /* Span full width */
+      background: var(--primary-accent);
+      color: white;
+      font-weight: 700;
+    }
+     button.primary:hover {
+      background: var(--secondary-accent);
+    }
+    
+    #output {
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 14px;
+      min-height: 60px;
+      font-size: 14px;
+      line-height: 1.5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    #output .placeholder-text {
+      color: var(--placeholder-color);
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="background-animation"></div>
+
+  <div class="container">
+    <div class="header">
+      <img src="icon.png" alt="Humor Hub Icon">
+      <h2>Humor Hub</h2>
+    </div>
+
+    <button id="trendingBtn" class="primary">Get Today's Trend</button>
+    
+    <textarea id="memeInput" placeholder="Paste meme caption to explain or remix..."></textarea>
+    
+    <div class="button-group">
+      <button id="explainBtn">Explain</button>
+      <button id="remixBtn">Remix</button>
+    </div>
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+      <input type="file" id="memeImageInput" accept="image/*" style="padding:4px;" />
+      <div id="pasteImageArea" style="border:2px dashed #85c1e9;padding:12px;text-align:center;color:#7f8c8d;cursor:pointer;min-height:60px;">Paste image here (Ctrl+V)</div>
+    <button id="explainImageBtn">Explain Image</button>
+    <button id="remixImageBtn">Remix Image</button>
+    </div>
+
+    <div id="output">
+      <span class="placeholder-text">Humour Explaination.....</span>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+  </body>
+</html>
