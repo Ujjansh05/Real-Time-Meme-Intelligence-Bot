@@ -23,8 +23,7 @@ This bot transforms memes into an interactive experience:
 ---
 
 ### ⚡ Tech Stack
-- [Pathway](https://github.com/pathwaycom/pathway) → real-time data ingestion, indexing, and streaming analytics
-- **Pathway** → Real-time data ingestion, trend calculation, and streaming analytics.
+- **[Pathway](https://github.com/pathwaycom/pathway)** → real-time data ingestion, indexing, and streaming analytics
 - **FastAPI** → backend to serve REST APIs (`/trending`, `/explain`, `/remix`,`/explain-image`)
 - **Google Gemini AI** → State-of-the-art model for multimodal meme explanation and remix generation.
 - **Chrome Extension (Manifest V3)** → Intuitive popup UI and seamless browser integration.
@@ -35,7 +34,7 @@ This bot transforms memes into an interactive experience:
 
 #### 1. Clone the Repository
 ```bash
-it clone [https://github.com/your-username/humor-hub.git](https://github.com/your-username/humor-hub.git)
+git clone [https://github.com/your-username/humor-hub.git](https://github.com/your-username/humor-hub.git)
 cd humor-hub
 ````
 
