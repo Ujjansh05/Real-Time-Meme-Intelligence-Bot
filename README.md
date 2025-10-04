@@ -140,6 +140,17 @@ Real-Time-Meme-Intelligence-Bot/
 
 Feel free to open issues or pull requests. If you want me to add automated tests or a small utility script to (re)generate the extension package, tell me what behavior you'd like.
 
+##Made By
+UjjanshSundram (The Og one)
+
+##Future Scope
+- Adaptive Meme Styling: Enables AI to customize meme tone and theme (e.g., dark humor, corporate memes, relatable culture) based on user preference.
+Future Improvements
+- 🔮 AI Image Generation: Integrate a model like Imagen to generate new meme images from text prompts.
+- 🌍 Multi-Language Support: Expand the AI prompts to provide meme explanations in multiple languages.
+- 🗳 User Feedback System: Implement a voting system inside the extension for users to rate the quality of AI explanations.
+- 🧠 Automated Data Ingestion: Connect the Pathway pipeline to a live source like the Reddit API for fully autonomous trend detection.
+
 ## License
 
 MIT
