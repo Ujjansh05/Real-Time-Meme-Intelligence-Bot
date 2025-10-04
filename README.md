@@ -42,7 +42,7 @@ cd humor-hub
 
 Navigate to the `backend` folder and install dependencies:
 
-```bash
+
 # Real-Time Meme Intelligence Bot
 
 A lightweight project that ingests meme captions, detects trending formats and exposes a small FastAPI backend plus a browser extension UI.
@@ -61,7 +61,7 @@ Key behaviors in this workspace:
 
 1. Create and activate a virtual environment, then install dependencies:
 
-```powershell
+```
 cd "c:\Users\ujjan\OneDrive\Desktop\python_projects\GGWave\Real-Time-Meme-Intelligence-Bot"
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
