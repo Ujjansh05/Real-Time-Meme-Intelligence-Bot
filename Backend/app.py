@@ -9,6 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import google.generativeai as genai
 from datetime import datetime
+import json
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -37,6 +38,37 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 CSV_FILE = DATA_DIR / "memes.csv"
 TRENDING_FILE = DATA_DIR / "trending_formats.jsonl" # Path to Pathway's output
+REMIX_FILE = DATA_DIR / "remixes.jsonl"
+
+
+def get_trending_formats(top_n: int = 3):
+    """
+    Read the TRENDING_FILE JSONL and return the top_n format names (best-effort).
+    """
+    formats = []
+    try:
+        if TRENDING_FILE.exists():
+            with open(TRENDING_FILE, "r", encoding="utf-8") as f:
+                lines = [line.strip() for line in f if line.strip()]
+            objs = []
+            for ln in lines:
+                try:
+                    objs.append(json.loads(ln))
+                except Exception:
+                    # If line isn't valid JSON, treat it as a plain format name
+                    objs.append({"format": ln})
+            # If 'score' exists, sort by it; otherwise preserve order
+            if any(o.get("score") is not None for o in objs):
+                objs_sorted = sorted(objs, key=lambda o: -(o.get("score") or 0))
+            else:
+                objs_sorted = objs
+            for o in objs_sorted[:top_n]:
+                fmt = o.get("format") or str(o)
+                formats.append(fmt)
+    except Exception:
+        # non-fatal: return empty list if anything goes wrong
+        return []
+    return formats
 
 # --- Create starter dataset if it's missing ---
 if not CSV_FILE.exists():
@@ -170,9 +202,38 @@ def remix_meme(meme: str = Query(..., min_length=1)):
     Remixes a meme caption into an IIT student life version using the Gemini API.
     """
     try:
-        response = model.generate_content(
-            f"Remix the meme caption '{meme}' into a witty IIT student life version under 20 words."
-        )
-        return {"remix": response.text.strip()}
+        # Gather top trending formats to influence the remix
+        top_formats = get_trending_formats(top_n=3)
+        if top_formats:
+            fmt_list = ", ".join(top_formats)
+            prompt = (
+                f"The following meme formats are trending right now: {fmt_list}.\n"
+                f"Using the trending formats as inspiration, remix the meme caption below into 3 witty variations (under 20 words each).\n\n"
+                f"Original caption: \"{meme}\"\n\n"
+                "Return each variation on its own line and, if possible, prefix it with the format it best fits (e.g., 'drake: ...')."
+            )
+        else:
+            prompt = f"Remix the meme caption '{meme}' into a witty IIT student life version under 20 words. Provide 3 variations, each on a new line."
+
+        response = model.generate_content(prompt)
+        remix_text = response.text.strip()
+
+        # Persist remix for caching / inspection
+        try:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            entry = {
+                "time": int(datetime.utcnow().timestamp() * 1000),
+                "original": meme,
+                "formats_used": top_formats,
+                "remix_raw": remix_text,
+            }
+            with open(REMIX_FILE, "a", encoding="utf-8") as rf:
+                rf.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception:
+            # non-fatal
+            pass
+
+        variations = [line.strip() for line in remix_text.splitlines() if line.strip()]
+        return {"remix": remix_text, "variations": variations, "formats_used": top_formats}
     except Exception as e:
         return {"remix": f"Error: {str(e)}"}
