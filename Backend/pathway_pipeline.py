@@ -1,30 +1,53 @@
-import pathway as pw
+# ...existing code...
+import csv, json
+from datetime import datetime
+from pathlib import Path
+from scores import compute_trending  # existing scorer
 
-# Define the schema to read both caption and format from the CSV
-class MemeSchema(pw.Schema):
-    caption: str
-    format: str
+DATA_DIR = Path(__file__).parent / "data"
+CSV_PATH = DATA_DIR / "live_memes.csv"
+OUT_PATH = DATA_DIR / "trending_formats.jsonl"
 
-# Step 1: Ingest memes from CSV in streaming mode.
-# Pathway will watch this file for any new memes you add.
-memes = pw.io.csv.read(
-    "data/memes.csv",
-    schema=MemeSchema,
-    mode="streaming",
-    autocommit_duration_ms=1000,
-)
+def load_live_memes():
+    rows = []
+    if not CSV_PATH.exists():
+        return rows
+    with CSV_PATH.open(newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for r in reader:
+            ts = r.get("timestamp") or ""
+            try:
+                ts_dt = datetime.fromisoformat(ts)
+            except Exception:
+                ts_dt = datetime.utcnow()
+            rows.append({
+                "caption": (r.get("caption") or "").strip(),
+                "format": (r.get("format") or "unknown").strip(),
+                "timestamp": ts_dt,
+                "engagement": int(r.get("engagement") or 0)
+            })
+    return rows
 
-# Step 2: Calculate real-time trending formats.
-# We group by the 'format' column and count how many times each format appears.
-trending_formats = memes.groupby(memes.format).reduce(
-    format=memes.format, count=pw.reducers.count(memes.caption)
-)
+def group_by_format(rows):
+    grouped = {}
+    for r in rows:
+        fmt = r["format"] or "unknown"
+        grouped.setdefault(fmt, []).append({"timestamp": r["timestamp"], "engagement": r["engagement"]})
+    return grouped
 
-# Step 3: Write the live results to a JSON Lines file.
-# Your FastAPI server will read this file to get the latest trends.
-pw.io.jsonlines.write(trending_formats, "data/trending_formats.jsonl")
+def run_trending_job():
+    rows = load_live_memes()
+    formats = group_by_format(rows)  # dict: format_name -> list of item dicts
+    # compute_trending expects formats mapping; adapt if necessary
+    scores = compute_trending(formats)  # returns {format_name: score}
+    # write JSONL lines with count/diff/time
+    now_ms = int(datetime.utcnow().timestamp() * 1000)
+    with OUT_PATH.open("w", encoding="utf-8") as out:
+        for fmt, score in sorted(scores.items(), key=lambda kv: -kv[1]):
+            count = len(formats.get(fmt, []))
+            obj = {"format": fmt, "count": count, "score": round(score, 3), "time": now_ms}
+            out.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
-# Step 4: Run the pipeline.
-# This will start the process and keep it running to watch for new data.
+# ...existing code...
 if __name__ == "__main__":
-    pw.run()
+    run_trending_job()

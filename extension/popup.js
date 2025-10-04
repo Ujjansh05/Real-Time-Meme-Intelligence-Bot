@@ -64,29 +64,6 @@ document.getElementById('explainImageBtn').addEventListener('click', async () =>
     updateResult('Failed to explain meme image. Make sure the backend server is running.');
   }
 });
-// Image explain button logic
-document.getElementById('explainImageBtn').addEventListener('click', async () => {
-  const imageInput = document.getElementById('memeImageInput');
-  const file = imageInput.files[0];
-  if (!file) {
-    updateResult('Please select an image to explain.');
-    return;
-  }
-  updateResult('Explaining meme image...');
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch('http://127.0.0.1:8000/explain_image', {
-      method: 'POST',
-      body: formData
-    });
-    const data = await response.json();
-    updateResult('Image Explanation: ' + data.explanation);
-  } catch (error) {
-    console.error('Error explaining meme image:', error);
-    updateResult('Failed to explain meme image. Make sure the backend server is running.');
-  }
-});
 // Function to update the result box
 function updateResult(text) {
   document.getElementById('output').innerHTML = text; // Use innerHTML to allow for a loader later

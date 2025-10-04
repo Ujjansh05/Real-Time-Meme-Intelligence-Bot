@@ -43,118 +43,103 @@ cd humor-hub
 Navigate to the `backend` folder and install dependencies:
 
 ```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
-Create a .env file from the example and add your Gemini API Key.
-```bash
-cp .env.example .env
-nano .env 
-# -> Set GEMINI_API_KEY="YOUR_API_KEY_HERE"
+# Real-Time Meme Intelligence Bot
+
+A lightweight project that ingests meme captions, detects trending formats and exposes a small FastAPI backend plus a browser extension UI.
+
+This repository contains a compact backend (FastAPI + ingestion pipeline) and a Chrome/Edge extension to interact with the service.
+
+Key behaviors in this workspace:
+- ingest meme captions (mock/static CSV data in `Backend/data/`)
+- a pipeline script that processes incoming captions (`Backend/pathway_pipeline.py`)
+- a FastAPI app in `Backend/app.py` exposing simple endpoints
+- a browser extension in `extension/` that calls the backend APIs
+
+> Note: For convenience the dataset `Backend/data/memes.csv` has been trimmed to unique entries.
+
+## Quick start (Windows PowerShell)
+
+1. Create and activate a virtual environment, then install dependencies:
+
+```powershell
+cd "c:\Users\ujjan\OneDrive\Desktop\python_projects\GGWave\Real-Time-Meme-Intelligence-Bot"
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r Backend\requirements.txt
 ```
 
-Run the two backend servers in separate terminals:
-Terminal 1 (Start the Pathway Pipeline):
-```bash
+2. Run the ingestion pipeline (optional) and the API server. Open two PowerShell terminals.
+
+Terminal A — run the pipeline (simulates ingestion / trend updates):
+
+```powershell
+cd Backend
 python pathway_pipeline.py
 ```
-Terminal 2 (Start the FastAPI Server):
-```bash
-uvicorn app:app --reload
+
+Terminal B — run the FastAPI server (from the `Backend` folder so imports work as-is):
+
+```powershell
+cd Backend
+uvicorn app:app --reload --port 8000
 ```
 
+The API will be available at: http://localhost:8000
 
-By default, the API runs at: 👉 `http://localhost:8000`
+### Common API endpoints (provided by `Backend/app.py`)
+- GET /trending — returns current top trending meme format(s)
+- GET /explain?meme=<text> — returns an explanation for a meme caption
+- GET /remix?meme=<text> — returns a short remix for a caption
 
-APIs available:
+(Exact endpoint names and parameters depend on `Backend/app.py` implementation; check that file for the definitive contract.)
 
-  - `/trending` → returns current trending meme format
-  - `/explain?meme=<text>` → explains the given meme caption
-  - `/remix?meme=<text>` → generates a remix of the meme
-  - `/explain-image` → Explains a meme from pasted image data.
+## Browser extension (local load)
 
-#### 3\. Load the Browser Extension
+1. Open Chrome/Edge and navigate to `chrome://extensions/`.
+2. Enable **Developer mode**.
+3. Click **Load unpacked** and select the `extension/` folder from the repo root.
+4. Use the popup UI to call the backend APIs.
 
-1.  Open Chrome/Edge and go to `chrome://extensions/`
-2.  Enable **Developer Mode**
-3.  Click **Load Unpacked**
-4.  Select the `extension/` folder
-    Now you’ll see the  Humor Hub icon in your browser toolbar 🎉
+## Data
 
-#### 4\. Using the Extension
+- `Backend/data/memes.csv` — mock dataset of meme captions and formats (now deduplicated).
+- `Backend/data/live_meme.csv`, `trending.jsonl`, `trending_formats.jsonl` — other data/artifacts used by the ingestion pipeline.
 
-  - Click the extension icon to open the popup.
-  - **Buttons available:**
-      - **Trending Meme** → fetch today’s trending meme format
-      - **Explain Meme** → paste meme caption → get explanation
-      - **Remix Meme** → paste meme caption → generate a remix
-  - **Optional:** Highlight a meme caption → right-click → "Explain with Meme Bot"
+If you want to reset `memes.csv` to its original raw copy, keep a backup before running automated transforms.
 
------
-
-### 📂 Project Structure
+## Project structure
 
 ```
-humor-hub/
-│── backend/
-│   ├── app.py              # FastAPI backend (API endpoints)
-│   ├── pathway_pipeline.py   # Pathway ingestion + trend detection
-│   ├── requirements.txt      # Python dependencies
-│   ├── .env.example          # Example environment file
-│   └── data/
-│       └── memes.csv         # Mock streaming meme dataset
-│
-│── extension/
-│   ├── manifest.json         # Chrome extension config
-│   ├── popup.html            # Extension popup UI
-│   ├── popup.js              # API calls and frontend logic
-│   └── icon.png              # Extension icon
-│
-└── README.md                 # Project documentation
+Real-Time-Meme-Intelligence-Bot/
+├─ Backend/
+│  ├─ app.py                 # FastAPI app
+│  ├─ pathway_pipeline.py    # ingestion / processing pipeline (simulated)
+│  ├─ reddit_stream.py       # optional helper to stream from Reddit (if configured)
+│  ├─ requirements.txt       # Python dependencies
+│  └─ data/                  # sample and runtime data
+│     ├─ memes.csv
+│     ├─ live_meme.csv
+│     ├─ trending.jsonl
+│     └─ trending_formats.jsonl
+├─ extension/
+│  ├─ background.js
+│  ├─ popup.html
+│  ├─ popup.js
+│  ├─ manifest.json
+│  └─ icon.png
+└─ README.md
 ```
 
------
+## Notes, assumptions and next steps
 
-### 🎬 Demo Workflow
+- Assumption: environment secrets (API keys) are configured outside this repo or added by you. There is no checked-in `.env` file in `Backend/` in the current workspace; if your code expects keys, create a `.env` or configure them in your shell.
+- If you want the repo to connect to live sources (Reddit, Twitter), add credentials and enable the corresponding code paths in `Backend/reddit_stream.py` or `pathway_pipeline.py`.
+- I can add a small `scripts/dedupe_memes.py` utility to make deduplication repeatable, and create a `Backend/.env.example` if you want.
 
-1.  Add a new meme to `backend/data/memes.csv` to simulate a live event.
-2.  Pathway ingests it instantly and updates the trending index in real-time.
-3.  Ask the extension: “What’s trending now?” → it immediately reflects the new meme format.
-4.  Paste a meme → Explain → AI describes why it’s funny.
-5.  Hit Remix → AI generates a new caption (e.g., IIT life version).
-6.  (Future Scope) Auto-generate meme images with Stable Diffusion for extra flair.
+## Contributing
 
------
+Feel free to open issues or pull requests. If you want me to add automated tests or a small utility script to (re)generate the extension package, tell me what behavior you'd like.
 
-### 🏆 Hackathon Highlights
+## License
 
-  - Showcases **real-time AI** with Pathway
-  - Combines fun + creativity + technical depth
-  - Extension interface → makes the solution practical and user-friendly
-  - Easy demo: judges will see memes appear live → instantly explained/remixed
-
------
-
-### 📌 Future Improvements
-
-  - 🔮 AI Image Generation: Integrate a model like Imagen to generate new meme images from text prompts.
-  - 🌍 Multi-Language Support: Expand the AI prompts to provide meme explanations in multiple languages.
-  - 🗳 User Feedback System: Implement a voting system inside the extension for users to rate the quality of AI explanations.
-  - 🧠 Automated Data Ingestion: Connect the Pathway pipeline to a live source like the Reddit API for fully autonomous trend detection.
-
------
-
-### 🤝 Contributors
-
-UjjanshSundram (The Og one)
-
------
-
-### 📜 License
-
-MIT License – feel free to use and remix memes responsibly 🙃
-
-```
-```
+MIT
