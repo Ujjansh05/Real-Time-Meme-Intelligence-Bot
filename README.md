@@ -2,7 +2,7 @@
 # 🤖 Humour Hub
 <img width="858" height="852" alt="Gemini_Generated_Image_7lbzm37lbzm37lbz" src="https://github.com/user-attachments/assets/50f6e0e2-fd19-4645-9640-4b7f8bc7ac92" />
 
-A fun and innovative project built for the **Pathway X Iota Cluster IIT Ropar Gen AI Hackathon** 🎉
+A fun and innovative project built for the **  MEMES LOVERS ** 🎉
 
 This bot transforms memes into an interactive experience:
 - 🔥 Detects **trending meme formats** in real-time
