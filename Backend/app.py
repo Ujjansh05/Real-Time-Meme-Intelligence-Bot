@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 from datetime import datetime
 import json
+from fastapi.responses import JSONResponse
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -107,7 +108,7 @@ async def remix_image(file: UploadFile = File(...)):
         image.save(buf, format='JPEG')
         processed_bytes = buf.getvalue()
         image_b64 = base64.b64encode(processed_bytes).decode('utf-8')
-        prompt = "Remix the meme in this image into a witty IIT student life version under 20 words."
+        prompt = "Remix this meme for IIT students. Max 15 words. Witty."
         response = model.generate_content([
             prompt,
             {"mime_type": "image/jpeg", "data": image_b64}
@@ -117,9 +118,6 @@ async def remix_image(file: UploadFile = File(...)):
         return JSONResponse(content={"remix": f"Error: {str(e)}"}, status_code=500)
    
 
-import base64
-from fastapi.responses import JSONResponse
-# --- API Endpoints ---
 @app.post("/explain_image")
 async def explain_image(file: UploadFile = File(...)):
     """
@@ -139,7 +137,7 @@ async def explain_image(file: UploadFile = File(...)):
         image.save(buf, format='JPEG')
         processed_bytes = buf.getvalue()
         image_b64 = base64.b64encode(processed_bytes).decode('utf-8')
-        prompt = "Explain this meme image in one or two simple sentences so anyone can understand why it's funny. Avoid complex words and keep it casual."
+        prompt = "Explain why this is funny. Simple, casual, max 2 sentences."
         response = model.generate_content([
             prompt,
             {"mime_type": "image/jpeg", "data": image_b64}
@@ -159,11 +157,9 @@ def get_trending():
     """
     Uses the LLM to generate today's trending meme format, stores it in the trending_formats.jsonl dataset, and returns it.
     """
-    from datetime import datetime
-    import json
     try:
         # Use LLM to generate today's trending meme format
-        prompt = "Give me the name of a meme format that is trending today. Only return the meme format name, nothing else."
+        prompt = "One trending meme format name. Nothing else."
         response = model.generate_content(prompt)
         trending_format = response.text.strip().replace('\n', '')
         # Store in trending_formats.jsonl
@@ -189,7 +185,7 @@ def explain_meme(meme: str = Query(..., min_length=1)):
     """
     try:
         response = model.generate_content(
-            f"Explain this meme caption in plain, simple language and why it's funny:\n\n\"{meme}\""
+            f"Explain why this is funny. Simple, short:\n\"{meme}\""
         )
         return {"explanation": response.text.strip()}
     except Exception as e:
@@ -207,13 +203,12 @@ def remix_meme(meme: str = Query(..., min_length=1)):
         if top_formats:
             fmt_list = ", ".join(top_formats)
             prompt = (
-                f"The following meme formats are trending right now: {fmt_list}.\n"
-                f"Using the trending formats as inspiration, remix the meme caption below into 3 witty variations (under 20 words each).\n\n"
-                f"Original caption: \"{meme}\"\n\n"
-                "Return each variation on its own line and, if possible, prefix it with the format it best fits (e.g., 'drake: ...')."
+                f"Trending: {fmt_list}.\n"
+                f"Remix this caption into 3 witty variations (max 15 words) using trending formats:\n\"{meme}\"\n"
+                "Format: 'format_name: variation'"
             )
         else:
-            prompt = f"Remix the meme caption '{meme}' into a witty IIT student life version under 20 words. Provide 3 variations, each on a new line."
+            prompt = f"Remix '{meme}' for IIT students. 3 witty variations. Max 15 words each."
 
         response = model.generate_content(prompt)
         remix_text = response.text.strip()
