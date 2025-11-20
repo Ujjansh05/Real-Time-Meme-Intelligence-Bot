@@ -1,117 +1,184 @@
-// Remix image button logic
-document.getElementById('remixImageBtn').addEventListener('click', async () => {
-  const imageInput = document.getElementById('memeImageInput');
-  const file = pastedImageFile || imageInput.files[0];
-  if (!file) {
-    updateResult('Please select or paste an image to remix.');
-    return;
+// Tab Switching Logic
+const tabs = document.querySelectorAll('.tab');
+const tabContents = document.querySelectorAll('.tab-content');
+
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    // Remove active class from all tabs and contents
+    tabs.forEach(t => t.classList.remove('active'));
+    tabContents.forEach(c => c.classList.remove('active'));
+
+    // Add active class to clicked tab and corresponding content
+    tab.classList.add('active');
+    const targetId = tab.getAttribute('data-tab') + '-tab';
+    document.getElementById(targetId).classList.add('active');
+  });
+});
+
+// UI Helper Functions
+const outputArea = document.getElementById('output');
+const resultText = document.getElementById('resultText');
+const loader = document.getElementById('loader');
+const placeholder = document.querySelector('.placeholder');
+
+function showLoader() {
+  placeholder.style.display = 'none';
+  resultText.style.display = 'none';
+  loader.style.display = 'block';
+}
+
+function hideLoader() {
+  loader.style.display = 'none';
+  resultText.style.display = 'block';
+}
+
+function updateResult(text, isError = false) {
+  hideLoader();
+  if (isError) {
+    resultText.innerHTML = `<span style="color: #ef4444;">${text}</span>`;
+  } else {
+    resultText.innerText = text;
   }
-  updateResult('Remixing meme image...');
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch('http://127.0.0.1:8000/remix_image', {
-      method: 'POST',
-      body: formData
-    });
-    const data = await response.json();
-    updateResult('Image Remix: ' + data.remix);
-  } catch (error) {
-    console.error('Error remixing meme image:', error);
-    updateResult('Failed to remix meme image. Make sure the backend server is running.');
+}
+
+// Image Handling
+const dropZone = document.getElementById('dropZone');
+const imageInput = document.getElementById('memeImageInput');
+const imagePreview = document.getElementById('imagePreview');
+let selectedImageFile = null;
+
+// Handle file selection via input
+imageInput.addEventListener('change', (e) => {
+  if (e.target.files && e.target.files[0]) {
+    handleImageFile(e.target.files[0]);
   }
 });
-// Handle image paste
-const pasteImageArea = document.getElementById('pasteImageArea');
-let pastedImageFile = null;
-pasteImageArea.addEventListener('paste', (event) => {
+
+// Handle paste events (Ctrl+V)
+document.addEventListener('paste', (event) => {
+  // Only handle paste if we are on the image tab or if the user explicitly pasted into the drop zone
+  // But for better UX, let's just capture any image paste if the extension is open
   const items = event.clipboardData.items;
   for (let i = 0; i < items.length; i++) {
     if (items[i].type.indexOf('image') !== -1) {
       const file = items[i].getAsFile();
-      pastedImageFile = file;
-      // Show preview
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        pasteImageArea.innerHTML = `<img src="${e.target.result}" style="max-width:100%;max-height:120px;" />`;
-      };
-      reader.readAsDataURL(file);
+      handleImageFile(file);
+      // Switch to image tab if not active
+      document.querySelector('[data-tab="image"]').click();
       break;
     }
   }
 });
 
-// Modify explain image button to use pasted image if available
-document.getElementById('explainImageBtn').addEventListener('click', async () => {
-  const imageInput = document.getElementById('memeImageInput');
-  const file = pastedImageFile || imageInput.files[0];
-  if (!file) {
-    updateResult('Please select or paste an image to explain.');
-    return;
-  }
-  updateResult('Explaining meme image...');
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch('http://127.0.0.1:8000/explain_image', {
-      method: 'POST',
-      body: formData
-    });
-    const data = await response.json();
-    updateResult('Image Explanation: ' + data.explanation);
-  } catch (error) {
-    console.error('Error explaining meme image:', error);
-    updateResult('Failed to explain meme image. Make sure the backend server is running.');
+// Handle Drag & Drop
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('dragover');
+});
+
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+    handleImageFile(e.dataTransfer.files[0]);
   }
 });
-// Function to update the result box
-function updateResult(text) {
-  document.getElementById('output').innerHTML = text; // Use innerHTML to allow for a loader later
+
+function handleImageFile(file) {
+  selectedImageFile = file;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    imagePreview.src = e.target.result;
+    imagePreview.style.display = 'block';
+    // Hide the text prompt in dropzone for cleaner look
+    dropZone.querySelector('p').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
 }
 
-// Event listeners for the buttons
-document.getElementById('trendingBtn').addEventListener('click', async () => {
-  updateResult('Fetching trending meme...');
+// API Interaction Logic
+const BASE_URL = 'http://127.0.0.1:8000';
+
+async function callApi(endpoint, method = 'GET', body = null) {
+  showLoader();
   try {
-    const response = await fetch('http://127.0.0.1:8000/trending');
-    const data = await response.json();
-    updateResult('Trending Meme: ' + data.trending_meme);
+    const options = { method };
+    if (body) {
+      options.body = body;
+    }
+    
+    const response = await fetch(`${BASE_URL}${endpoint}`, options);
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+    return await response.json();
   } catch (error) {
-    console.error('Error fetching trending meme:', error);
-    updateResult('Failed to fetch trending meme. Make sure the backend server is running.');
+    console.error('API Error:', error);
+    updateResult('Failed to connect to backend. Is it running?', true);
+    throw error;
   }
+}
+
+// Buttons
+document.getElementById('trendingBtn').addEventListener('click', async () => {
+  try {
+    const data = await callApi('/trending');
+    updateResult('🔥 Trending: ' + data.trending_meme);
+  } catch (e) {}
 });
 
 document.getElementById('explainBtn').addEventListener('click', async () => {
-  const memeText = document.getElementById('memeInput').value;
-  if (memeText) {
-    updateResult('Explaining meme...');
-    try {
-      const response = await fetch(`http://127.0.0.1:8000/explain?meme=${encodeURIComponent(memeText)}`);
-      const data = await response.json();
-      updateResult('Explanation: ' + data.explanation);
-    } catch (error) {
-      console.error('Error explaining meme:', error);
-      updateResult('Failed to explain meme. Make sure the backend server is running.');
-    }
-  } else {
-    updateResult('Please enter a meme caption to explain.');
+  const text = document.getElementById('memeInput').value.trim();
+  if (!text) {
+    updateResult('Please enter some text to explain.', true);
+    return;
   }
+  try {
+    const data = await callApi(`/explain?meme=${encodeURIComponent(text)}`);
+    updateResult(data.explanation);
+  } catch (e) {}
 });
 
 document.getElementById('remixBtn').addEventListener('click', async () => {
- const memeText = document.getElementById('memeInput').value;
-  if (memeText) {
-    updateResult('Remixing meme...');
-    try {
-      const response = await fetch(`http://127.0.0.1:8000/remix?meme=${encodeURIComponent(memeText)}`);
-      const data = await response.json();
-      updateResult('Remix: ' + data.remix);
-    } catch (error) {
-      console.error('Error remixing meme:', error);
-      updateResult('Failed to remix meme. Make sure the backend server is running.');
-    }
-  } else {
-    updateResult('Please enter a meme caption to remix.');
+  const text = document.getElementById('memeInput').value.trim();
+  if (!text) {
+    updateResult('Please enter some text to remix.', true);
+    return;
   }
+  try {
+    const data = await callApi(`/remix?meme=${encodeURIComponent(text)}`);
+    updateResult(data.remix);
+  } catch (e) {}
+});
+
+document.getElementById('explainImageBtn').addEventListener('click', async () => {
+  if (!selectedImageFile) {
+    updateResult('Please upload or paste an image first.', true);
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', selectedImageFile);
+  
+  try {
+    const data = await callApi('/explain_image', 'POST', formData);
+    updateResult(data.explanation);
+  } catch (e) {}
+});
+
+document.getElementById('remixImageBtn').addEventListener('click', async () => {
+  if (!selectedImageFile) {
+    updateResult('Please upload or paste an image first.', true);
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', selectedImageFile);
+  
+  try {
+    const data = await callApi('/remix_image', 'POST', formData);
+    updateResult(data.remix);
+  } catch (e) {}
 });
