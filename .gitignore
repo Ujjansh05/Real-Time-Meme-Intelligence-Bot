@@ -27,6 +27,12 @@ venv/
 ENV/
 env/
 
+# Node dependencies
+node_modules/
+
+# Local release previews
+artifacts/
+
 # Environment Variables
 .env
 .env.local

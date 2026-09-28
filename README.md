@@ -1,156 +1,57 @@
+# Humour Hub
 
-# 🤖 Humour Hub
-<img width="858" height="852" alt="Gemini_Generated_Image_7lbzm37lbzm37lbz" src="https://github.com/user-attachments/assets/50f6e0e2-fd19-4645-9640-4b7f8bc7ac92" />
+Humour Hub is a free, open-source Chrome and Edge extension for understanding and creating memes. Explain a caption or image, ask for three remixes in English, Hindi, or Hinglish, edit a meme, and download it as a PNG. Drafts and favorites stay in your browser. The AI features use a hosted API with a daily public beta allowance.
 
-A fun and innovative project built for the **MEMES LOVERS** 🎉
+## Install
 
-This bot transforms memes into an interactive experience:
-- 🔥 Detects **trending meme formats** in real-time
-- 📝 **Explains memes** (for people who don’t get the reference)
-- 🎭 **Remixes memes** into new contexts (e.g., IIT student life, wholesome version)
-- 🧩 Works as a **browser extension** for quick, efficient usage
+For a public release, download the extension ZIP from the project's GitHub Actions artifact or Releases page. Extract it, open `chrome://extensions/` or `edge://extensions/`, enable Developer mode, and choose **Load unpacked** on the extracted folder. The ZIP must contain `manifest.json` at its top level. The same package can be submitted to Microsoft Edge Add-ons. Chrome Web Store publication requires a developer account and a separate store submission.
 
----
+The extension's popup handles quick explanations and remixes. Open the full editor from the popup to compose images, keep drafts, and browse source-labeled trends. Only content you explicitly submit for AI is sent to the hosted API. [Privacy notice](PRIVACY.md).
 
-### 🌟 Features
-- **Real-Time Ingestion with Pathway** → continuously streams meme captions from APIs or mock feeds
-- **Dynamic RAG Pipeline** → keeps knowledge always updated with the latest memes
-- **Trend Detection** → identifies the fastest-growing meme clusters
-- **Meme Explanation** → explains the cultural or humorous reference behind a meme
-- **Meme Remixing** → generates new versions of memes in different styles
-- **Browser Extension (Chrome/Edge)** → easy to use while scrolling Twitter/Reddit
+## Run locally
 
----
+Requirements: Python 3.12+, Node.js 22+, and npm.
 
-### ⚡ Tech Stack
-- **[Pathway](https://github.com/pathwaycom/pathway)** → real-time data ingestion, indexing, and streaming analytics
-- **FastAPI** → backend to serve REST APIs (`/trending`, `/explain`, `/remix`,`/explain-image`)
-- **Google Gemini AI** → State-of-the-art model for multimodal meme explanation and remix generation.
-- **Chrome Extension (Manifest V3)** → Intuitive popup UI and seamless browser integration.
-
----
-
-### 🚀 Getting Started
-
-#### 1. Clone the Repository
-```bash
-git clone [https://github.com/your-username/humor-hub.git](https://github.com/your-username/humor-hub.git)
-cd humor-hub
-````
-
-#### 2\. Backend Setup
-
-Navigate to the `backend` folder and install dependencies:
-
-
-# Real-Time Meme Intelligence Bot
-
-A lightweight project that ingests meme captions, detects trending formats and exposes a small FastAPI backend plus a browser extension UI.
-
-This repository contains a compact backend (FastAPI + ingestion pipeline) and a Chrome/Edge extension to interact with the service.
-
-Key behaviors in this workspace:
-- ingest meme captions (mock/static CSV data in `Backend/data/`)
-- a pipeline script that processes incoming captions (`Backend/pathway_pipeline.py`)
-- a FastAPI app in `Backend/app.py` exposing simple endpoints
-- a browser extension in `extension/` that calls the backend APIs
-
-> Note: For convenience the dataset `Backend/data/memes.csv` has been trimmed to unique entries.
-
-## Quick start (Windows PowerShell)
-
-1. Create and activate a virtual environment, then install dependencies:
-
-```
-cd "c:\Users\ujjan\OneDrive\Desktop\python_projects\GGWave\Real-Time-Meme-Intelligence-Bot"
+```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r Backend\requirements.txt
-```
-
-2. Run the ingestion pipeline (optional) and the API server. Open two PowerShell terminals.
-
-Terminal A — run the pipeline (simulates ingestion / trend updates):
-
-```powershell
-cd Backend
-python pathway_pipeline.py
-```
-
-Terminal B — run the FastAPI server (from the `Backend` folder so imports work as-is):
-
-```powershell
+python -m pip install -r Backend\requirements.txt
+python -m pip install pytest httpx
 cd Backend
 uvicorn app:app --reload --port 8000
 ```
 
-The API will be available at: http://localhost:8000
+In another terminal:
 
-### Common API endpoints (provided by `Backend/app.py`)
-- GET /trending — returns current top trending meme format(s)
-- GET /explain?meme=<text> — returns an explanation for a meme caption
-- GET /remix?meme=<text> — returns a short remix for a caption
-
-(Exact endpoint names and parameters depend on `Backend/app.py` implementation; check that file for the definitive contract.)
-
-## Browser extension (local load)
-
-1. Open Chrome/Edge and navigate to `chrome://extensions/`.
-2. Enable **Developer mode**.
-3. Click **Load unpacked** and select the `extension/` folder from the repo root.
-4. Use the popup UI to call the backend APIs.
-
-## Data
-
-- `Backend/data/memes.csv` — mock dataset of meme captions and formats (now deduplicated).
-- `Backend/data/live_meme.csv`, `trending.jsonl`, `trending_formats.jsonl` — other data/artifacts used by the ingestion pipeline.
-
-If you want to reset `memes.csv` to its original raw copy, keep a backup before running automated transforms.
-
-## Project structure
-
-```
-Real-Time-Meme-Intelligence-Bot/
-├─ Backend/
-│  ├─ app.py                 # FastAPI app
-│  ├─ pathway_pipeline.py    # ingestion / processing pipeline (simulated)
-│  ├─ reddit_stream.py       # optional helper to stream from Reddit (if configured)
-│  ├─ requirements.txt       # Python dependencies
-│  └─ data/                  # sample and runtime data
-│     ├─ memes.csv
-│     ├─ live_meme.csv
-│     ├─ trending.jsonl
-│     └─ trending_formats.jsonl
-├─ extension/
-│  ├─ background.js
-│  ├─ popup.html
-│  ├─ popup.js
-│  ├─ manifest.json
-│  └─ icon.png
-└─ README.md
+```powershell
+cd extension
+npm ci
+npm run build
 ```
 
-## Notes, assumptions and next steps
+Load `extension/dist` as an unpacked extension. Without service credentials, editing and saved content work locally, while the API reports that AI is unavailable. `Backend/.env.example` lists the deployment settings; set them in the process environment or your hosting dashboard. The backend does not require users to supply API keys.
 
-- Assumption: environment secrets (API keys) are configured outside this repo or added by you. There is no checked-in `.env` file in `Backend/` in the current workspace; if your code expects keys, create a `.env` or configure them in your shell.
-- If you want the repo to connect to live sources (Reddit, Twitter), add credentials and enable the corresponding code paths in `Backend/reddit_stream.py` or `pathway_pipeline.py`.
-- I can add a small `scripts/dedupe_memes.py` utility to make deduplication repeatable, and create a `Backend/.env.example` if you want.
+To build against a deployed API, set `VITE_API_BASE_URL` to its HTTPS origin before `npm run build`. This adds the matching host permission to the manifest. The CI ZIP artifact is created only when the repository variable `HUMOUR_HUB_API_URL` is set.
 
-## Contributing
+## Hosted services and limits
 
-Feel free to open issues or pull requests. If you want me to add automated tests or a small utility script to (re)generate the extension package, tell me what behavior you'd like.
+The public beta uses FastAPI, Cloudflare Workers AI, and Upstash Redis. Set a Cloudflare account ID and API token, Upstash REST URL and token, a random session signing secret, and the production extension origin in the backend environment. The server enforces daily limits of five AI actions per installation, twenty per network address, and one hundred across the service. Provider free-tier exhaustion may stop requests earlier. The meme editor and local library continue to work.
 
-##Made By
-UjjanshSundram (The Og one)
+Cloudflare's Llama 3.2 Vision model requires the deployer to review and accept its license before the first image request. See [third-party notices](THIRD_PARTY_NOTICES.md). Do not enable a paid plan to maintain the intended ₹0 operating budget.
 
-##Future Scope
-- Adaptive Meme Styling: Enables AI to customize meme tone and theme (e.g., dark humor, corporate memes, relatable culture) based on user preference.
-Future Improvements
-- 🔮 AI Image Generation: Integrate a model like Imagen to generate new meme images from text prompts.
-- 🌍 Multi-Language Support: Expand the AI prompts to provide meme explanations in multiple languages.
-- 🗳 User Feedback System: Implement a voting system inside the extension for users to rate the quality of AI explanations.
-- 🧠 Automated Data Ingestion: Connect the Pathway pipeline to a live source like the Reddit API for fully autonomous trend detection.
+## Live discovery
 
-## License
+Trend cards show their source and last observation time. Wikipedia interest tracks changes in readership of known meme articles. Reddit and Bluesky integrations are optional and need approved or working source access. If a source is unavailable, the UI says so; it never invents a trend. The collector is designed for scheduled runs and persists snapshots in Redis. See [deployment guide](docs/DEPLOYMENT.md) for the source configuration and scheduled job.
 
-MIT
+## Development and checks
+
+```powershell
+python -m pytest -q Backend
+cd extension
+npm run check
+npm run build
+```
+
+The API exposes `POST /api/v1/session`, `POST /api/v1/explain`, `POST /api/v1/remix`, `GET /api/v1/trends`, and `GET /api/v1/status`. API documentation is available at `/docs` when the backend runs. Anonymous session tokens go in the `Authorization: Bearer` header for AI requests. Legacy routes remain as compatibility adapters.
+
+Security reports can be sent privately through GitHub's repository security advisory feature. Do not post keys or private meme content in public issues. This project is licensed under [MIT](LICENSE).

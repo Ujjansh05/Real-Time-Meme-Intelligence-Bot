@@ -1,234 +1,245 @@
-import base64
-from fastapi import FastAPI, Query, File, UploadFile
-from PIL import Image
-from io import BytesIO
-from fastapi.middleware.cors import CORSMiddleware
-import pandas as pd
-import os
-from pathlib import Path
-from dotenv import load_dotenv
-import google.generativeai as genai
-from datetime import datetime
+"""Public API for the Humour Hub extension."""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import ipaddress
 import json
+import time
+from typing import Any
+
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.datastructures import UploadFile
+from python_multipart.exceptions import MultipartParseError
 
-# Load environment variables from a .env file
-load_dotenv()
-GEMINI_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_KEY:
-    raise RuntimeError(" GEMINI_API_KEY not found in .env file. Please set it in Backend/.env")
-
-# Configure the Gemini API
-genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
-
-# Setup the FastAPI application
-app = FastAPI(title="Meme Intelligence Bot API")
-
-# Add CORS middleware to allow your extension to access the API
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],   # For development only.
-    allow_methods=["*"],
-    allow_headers=["*"],
+import ai
+from config import settings
+import quota
+from validation import (
+    ALLOWED_LANGUAGES,
+    ALLOWED_TONES,
+    InputError,
+    MAX_UPLOAD_BYTES,
+    normalize_image,
+    validate_option,
+    validate_text,
 )
 
-# --- File Paths ---
-BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
-CSV_FILE = DATA_DIR / "memes.csv"
-TRENDING_FILE = DATA_DIR / "trending_formats.jsonl" # Path to Pathway's output
-REMIX_FILE = DATA_DIR / "remixes.jsonl"
+
+app = FastAPI(title="Humour Hub API", version="1.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(settings.allowed_origins),
+    allow_origin_regex=r"chrome-extension://[a-p]{32}",
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+_trends_cache: tuple[float, dict] | None = None
+_trends_lock = asyncio.Lock()
 
 
-def get_trending_formats(top_n: int = 3):
-    """
-    Read the TRENDING_FILE JSONL and return the top_n format names (best-effort).
-    """
-    formats = []
+def _error(status: int, code: str, message: str) -> JSONResponse:
+    return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(_: Request, __: RequestValidationError) -> JSONResponse:
+    return _error(400, "invalid_request", "Check the request fields and try again.")
+
+
+@app.exception_handler(HTTPException)
+async def http_error(_: Request, exc: HTTPException) -> JSONResponse:
+    return _error(exc.status_code, "invalid_request", str(exc.detail))
+
+
+def _client_ip(request: Request) -> str:
+    if settings.trust_proxy_headers:
+        # Render's Cloudflare edge overwrites this header. X-Forwarded-For can
+        # contain client-supplied entries, so it is deliberately ignored.
+        connecting_ip = request.headers.get("cf-connecting-ip", "")
+        try:
+            return str(ipaddress.ip_address(connecting_ip))
+        except ValueError:
+            pass
+    return request.client.host if request.client else "unknown"
+
+
+async def _bounded_body(request: Request, limit: int) -> bytes:
+    length = request.headers.get("content-length")
+    if length:
+        try:
+            if int(length) > limit:
+                raise InputError("Request is too large.")
+        except ValueError:
+            raise InputError("Invalid content length.") from None
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > limit:
+            raise InputError("Request is too large.")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+async def _input(request: Request) -> tuple[str, str, str, str, bytes | None]:
+    content_type = request.headers.get("content-type", "").lower()
+    if content_type.startswith("application/json"):
+        try:
+            data = json.loads(await _bounded_body(request, 16 * 1024))
+        except (ValueError, UnicodeDecodeError):
+            raise InputError("Invalid JSON request.") from None
+        if not isinstance(data, dict):
+            raise InputError("Request must be a JSON object.")
+        image = None
+    elif content_type.startswith("multipart/form-data"):
+        request._body = await _bounded_body(request, MAX_UPLOAD_BYTES + 65536)
+        try:
+            form = await request.form()
+        except (HTTPException, MultipartParseError):
+            raise InputError("Malformed multipart request.") from None
+        data = dict(form)
+        uploaded = data.get("file")
+        if uploaded is not None and not isinstance(uploaded, UploadFile):
+            raise InputError("File must be an image upload.")
+        image = None
+        if uploaded is not None:
+            try:
+                content = await uploaded.read(MAX_UPLOAD_BYTES + 1)
+            finally:
+                await uploaded.close()
+            image = normalize_image(content)
+    else:
+        raise InputError("Send JSON text or a multipart image upload.")
+    text = validate_text(data.get("text", ""), required=image is None)
+    language = validate_option(data.get("language"), ALLOWED_LANGUAGES, "language", "english")
+    language = {"en": "english", "hi": "hindi"}.get(language, language)
+    tone = validate_option(data.get("tone"), ALLOWED_TONES, "tone", "general")
+    topic = validate_text(data.get("topic", ""))
+    return text, language, tone, topic, image
+
+
+async def _reserve(request: Request, *, legacy: bool = False) -> dict[str, Any]:
+    if not settings.ai_configured:
+        raise ai.AIUnavailable()
+    if legacy:
+        identity = "legacy:" + hashlib.sha256(_client_ip(request).encode()).hexdigest()
+    else:
+        authorization = request.headers.get("authorization", "")
+        if not authorization.startswith("Bearer "):
+            raise quota.InvalidSession()
+        identity = quota.verify_session(settings, authorization.removeprefix("Bearer ").strip())
+    return await quota.reserve_call(settings, identity, _client_ip(request))
+
+
+async def _perform(request: Request, task: str, *, legacy: bool = False, supplied_text: str | None = None) -> dict | JSONResponse:
     try:
-        if TRENDING_FILE.exists():
-            with open(TRENDING_FILE, "r", encoding="utf-8") as f:
-                lines = [line.strip() for line in f if line.strip()]
-            objs = []
-            for ln in lines:
-                try:
-                    objs.append(json.loads(ln))
-                except Exception:
-                    # If line isn't valid JSON, treat it as a plain format name
-                    objs.append({"format": ln})
-            # If 'score' exists, sort by it; otherwise preserve order
-            if any(o.get("score") is not None for o in objs):
-                objs_sorted = sorted(objs, key=lambda o: -(o.get("score") or 0))
-            else:
-                objs_sorted = objs
-            for o in objs_sorted[:top_n]:
-                fmt = o.get("format") or str(o)
-                formats.append(fmt)
-    except Exception:
-        # non-fatal: return empty list if anything goes wrong
-        return []
-    return formats
+        if supplied_text is None:
+            text, language, tone, topic, image = await _input(request)
+        else:
+            text = validate_text(supplied_text, required=True)
+            language, tone, topic, image = "english", "student", "", None
+        allowed = await _reserve(request, legacy=legacy)
+        if task == "explain":
+            return {"explanation": await ai.explain(settings, text, language, image), "quota": allowed}
+        variations = await ai.remix(settings, text, language, tone, topic, image)
+        return {"variations": variations, "quota": allowed}
+    except InputError as exc:
+        return _error(400, "invalid_input", str(exc))
+    except quota.InvalidSession:
+        return _error(401, "invalid_session", "Start a new session and try again.")
+    except quota.QuotaExceeded as exc:
+        return _error(429, "quota_exceeded", f"Daily {exc.scope} AI limit reached. Try again after 00:00 UTC.")
+    except quota.QuotaUnavailable:
+        return _error(503, "quota_unavailable", "AI is temporarily unavailable. Local editing still works.")
+    except ai.AIUnavailable:
+        return _error(503, "ai_unavailable", "AI is not available right now. Local editing still works.")
+    except ai.AIProviderError:
+        return _error(502, "provider_error", "The AI provider could not complete this request. Try again later.")
 
-# --- Create starter dataset if it's missing ---
-if not CSV_FILE.exists():
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame([
-        {
-            "caption": "When you fix a bug at 3am",
-            "format": "drake",
-            "timestamp": datetime.utcnow().isoformat()
-        },
-        {
-            "caption": "Explaining my code to a coworker",
-            "format": "distracted boyfriend",
-            "timestamp": datetime.utcnow().isoformat()
-        },
-        {
-            "caption": "Me after writing one line of code",
-            "format": "drake",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    ]).to_csv(CSV_FILE, index=False)
-
-# --- API Endpoints ---
-@app.post("/remix_image")
-async def remix_image(file: UploadFile = File(...)):
-    """
-    Remixes a meme image into a witty IIT student life version using Gemini multimodal API and Pillow.
-    """
-    try:
-        image_bytes = await file.read()
-        image = Image.open(BytesIO(image_bytes))
-        image = image.convert('RGB')
-        max_size = (512, 512)
-        image.thumbnail(max_size)
-        buf = BytesIO()
-        image.save(buf, format='JPEG')
-        processed_bytes = buf.getvalue()
-        image_b64 = base64.b64encode(processed_bytes).decode('utf-8')
-        prompt = "Remix this meme for IIT students. Max 15 words. Witty."
-        response = model.generate_content([
-            prompt,
-            {"mime_type": "image/jpeg", "data": image_b64}
-        ])
-        return JSONResponse(content={"remix": response.text.strip()})
-    except Exception as e:
-        return JSONResponse(content={"remix": f"Error: {str(e)}"}, status_code=500)
-   
-
-@app.post("/explain_image")
-async def explain_image(file: UploadFile = File(...)):
-    """
-    Explains why a meme image is funny using the Gemini multimodal API, with Pillow for image processing.
-    """
-    try:
-        # Read image bytes
-        image_bytes = await file.read()
-        # Use Pillow to open and process the image
-        image = Image.open(BytesIO(image_bytes))
-        # Optionally, convert to RGB and resize (example: max 512px)
-        image = image.convert('RGB')
-        max_size = (512, 512)
-        image.thumbnail(max_size)
-        # Save processed image to bytes
-        buf = BytesIO()
-        image.save(buf, format='JPEG')
-        processed_bytes = buf.getvalue()
-        image_b64 = base64.b64encode(processed_bytes).decode('utf-8')
-        prompt = "Explain why this is funny. Simple, casual, max 2 sentences."
-        response = model.generate_content([
-            prompt,
-            {"mime_type": "image/jpeg", "data": image_b64}
-        ])
-        return JSONResponse(content={"explanation": response.text.strip()})
-    except Exception as e:
-        return JSONResponse(content={"explanation": f"Error: {str(e)}"}, status_code=500)
 
 @app.get("/")
-def root():
-    """Root endpoint to check if the API is running."""
-    return {"message": "Meme Intelligence Bot API is running!"}
+async def root() -> dict:
+    return {"message": "Humour Hub API", "version": "1.0.0"}
 
 
-@app.get("/trending")
-def get_trending():
-    """
-    Uses the LLM to generate today's trending meme format, stores it in the trending_formats.jsonl dataset, and returns it.
-    """
+@app.get("/api/v1/status")
+async def status() -> dict:
+    quota_available = await quota.is_available(settings)
+    return {
+        "status": "ok",
+        "ai_available": settings.ai_configured and quota_available,
+        "quota_available": quota_available,
+        "quota_reset_at": quota.reset_at().isoformat(),
+    }
+
+
+@app.post("/api/v1/session")
+async def session(request: Request) -> Any:
     try:
-        # Use LLM to generate today's trending meme format
-        prompt = "One trending meme format name. Nothing else."
-        response = model.generate_content(prompt)
-        trending_format = response.text.strip().replace('\n', '')
-        # Store in trending_formats.jsonl
-        entry = {
-            "format": trending_format,
-            "count": 1,
-            "diff": 1,
-            "time": int(datetime.utcnow().timestamp() * 1000)
-        }
-        # Ensure data dir exists
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        with open(TRENDING_FILE, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry) + "\n")
-        return {"trending_meme": trending_format}
-    except Exception as e:
-        return {"trending_meme": f"Error generating or saving trend: {str(e)}"}
+        token = quota.create_session(settings)
+        identity = quota.verify_session(settings, token)
+        remaining = await quota.remaining_quota(settings, identity, _client_ip(request))
+        return {"token": token, "quota": remaining}
+    except quota.QuotaUnavailable:
+        return _error(503, "quota_unavailable", "AI is temporarily unavailable. Local editing still works.")
+
+
+@app.post("/api/v1/explain")
+async def explain(request: Request) -> Any:
+    return await _perform(request, "explain")
+
+
+@app.post("/api/v1/remix")
+async def remix(request: Request) -> Any:
+    return await _perform(request, "remix")
+
+
+@app.get("/api/v1/trends")
+async def trends() -> dict:
+    global _trends_cache
+    from trends import get_trends
+    if _trends_cache and time.monotonic() - _trends_cache[0] < 60:
+        return _trends_cache[1]
+    async with _trends_lock:
+        if _trends_cache and time.monotonic() - _trends_cache[0] < 60:
+            return _trends_cache[1]
+        result = await asyncio.to_thread(get_trends)
+        _trends_cache = (time.monotonic(), result)
+        return result
 
 
 @app.get("/explain")
-def explain_meme(meme: str = Query(..., min_length=1)):
-    """
-    Explains why a meme caption is funny using the Gemini API.
-    """
-    try:
-        response = model.generate_content(
-            f"Explain why this is funny. Simple, short:\n\"{meme}\""
-        )
-        return {"explanation": response.text.strip()}
-    except Exception as e:
-        return {"explanation": f"Error: {str(e)}"}
+async def legacy_explain(request: Request, meme: str = Query(...)) -> Any:
+    return await _perform(request, "explain", legacy=True, supplied_text=meme)
 
 
 @app.get("/remix")
-def remix_meme(meme: str = Query(..., min_length=1)):
-    """
-    Remixes a meme caption into an IIT student life version using the Gemini API.
-    """
-    try:
-        # Gather top trending formats to influence the remix
-        top_formats = get_trending_formats(top_n=3)
-        if top_formats:
-            fmt_list = ", ".join(top_formats)
-            prompt = (
-                f"Trending: {fmt_list}.\n"
-                f"Remix this caption into 3 witty variations (max 15 words) using trending formats:\n\"{meme}\"\n"
-                "Format: 'format_name: variation'"
-            )
-        else:
-            prompt = f"Remix '{meme}' for IIT students. 3 witty variations. Max 15 words each."
+async def legacy_remix(request: Request, meme: str = Query(...)) -> Any:
+    result = await _perform(request, "remix", legacy=True, supplied_text=meme)
+    if isinstance(result, dict):
+        return {**result, "remix": "\n".join(result["variations"])}
+    return result
 
-        response = model.generate_content(prompt)
-        remix_text = response.text.strip()
 
-        # Persist remix for caching / inspection
-        try:
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            entry = {
-                "time": int(datetime.utcnow().timestamp() * 1000),
-                "original": meme,
-                "formats_used": top_formats,
-                "remix_raw": remix_text,
-            }
-            with open(REMIX_FILE, "a", encoding="utf-8") as rf:
-                rf.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception:
-            # non-fatal
-            pass
+@app.post("/explain_image")
+async def legacy_explain_image(request: Request) -> Any:
+    return await _perform(request, "explain", legacy=True)
 
-        variations = [line.strip() for line in remix_text.splitlines() if line.strip()]
-        return {"remix": remix_text, "variations": variations, "formats_used": top_formats}
-    except Exception as e:
-        return {"remix": f"Error: {str(e)}"}
+
+@app.post("/remix_image")
+async def legacy_remix_image(request: Request) -> Any:
+    result = await _perform(request, "remix", legacy=True)
+    if isinstance(result, dict):
+        return {**result, "remix": "\n".join(result["variations"])}
+    return result
+
+
+@app.get("/trending")
+async def legacy_trending() -> dict:
+    return await trends()

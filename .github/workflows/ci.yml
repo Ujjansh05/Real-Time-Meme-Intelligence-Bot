@@ -1,0 +1,54 @@
+name: Verify and package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install -r Backend/requirements.txt pytest httpx
+      - name: Test backend
+        run: python -m pytest -q Backend
+
+  extension:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build extension
+        env:
+          VITE_API_BASE_URL: ${{ vars.HUMOUR_HUB_API_URL }}
+        run: npm run build
+      - name: Create ZIP and checksum
+        if: ${{ vars.HUMOUR_HUB_API_URL != '' }}
+        working-directory: extension/dist
+        run: |
+          zip -qr ../humour-hub-extension-${{ github.sha }}.zip .
+          cd ..
+          sha256sum humour-hub-extension-${{ github.sha }}.zip > humour-hub-extension-${{ github.sha }}.zip.sha256
+      - uses: actions/upload-artifact@v4
+        if: ${{ vars.HUMOUR_HUB_API_URL != '' }}
+        with:
+          name: humour-hub-extension-${{ github.sha }}
+          path: |
+            extension/humour-hub-extension-${{ github.sha }}.zip
+            extension/humour-hub-extension-${{ github.sha }}.zip.sha256
