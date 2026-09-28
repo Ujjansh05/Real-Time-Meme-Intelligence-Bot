@@ -56,6 +56,10 @@ document.addEventListener('paste', event => {
 });
 
 async function runAi(kind: 'explain' | 'remix') {
+  if (!el<HTMLInputElement>('appAiConsent').checked) {
+    result.textContent = 'Agree to send your selected content for AI processing first.';
+    return;
+  }
   const controls = [el<HTMLButtonElement>('appExplain'), el<HTMLButtonElement>('appRemix')];
   controls.forEach(x => x.disabled = true);
   favorite.disabled = false; favorite.textContent = 'Save result to favorites';
@@ -334,11 +338,11 @@ async function start() {
   document.body.classList.toggle('dark', settings.theme === 'dark');
   el<HTMLInputElement>('apiBase').value = await getBase() || configuredBase();
   if (settings.pendingContext) {
-    const context = settings.pendingContext as { action: string; text?: string; image?: boolean };
+    const context = settings.pendingContext as { action: string; text?: string };
     await chrome.storage.local.remove('pendingContext');
     switchView('explain');
     el<HTMLTextAreaElement>('appText').value = context.text || '';
-    result.textContent = context.image ? 'Paste or upload the image to preview it before sending it to AI.' : `Selected text is ready to ${context.action}. Review it, then choose an action.`;
+    result.textContent = `Selected text is ready to ${context.action}. Review it, then choose an action.`;
   }
   await checkService();
 }

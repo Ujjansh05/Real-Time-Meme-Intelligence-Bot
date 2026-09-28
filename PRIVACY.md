@@ -4,7 +4,7 @@ Humour Hub is a browser extension for explaining and making memes. This notice d
 
 ## Content you choose to submit
 
-The extension sends text or an image to the Humour Hub API only when you request an AI explanation or remix. The API forwards that content to Cloudflare Workers AI to produce the answer. The extension does not read your browsing history or automatically upload images from pages. Review Cloudflare's [Workers AI data usage policy](https://developers.cloudflare.com/workers-ai/platform/data-usage/) for its processing terms.
+The extension sends text or an image to the Humour Hub API only after you check the AI consent box and request an explanation or remix. The API forwards that content to Cloudflare Workers AI to produce the answer. The extension does not read your browsing history or automatically upload images from pages. A right-click action can place selected page text into the extension for your review; it is not sent to AI automatically. Review Cloudflare's [Workers AI data usage policy](https://developers.cloudflare.com/workers-ai/platform/data-usage/) for its processing terms.
 
 The API processes uploads in memory. It does not intentionally save submitted text, images, or AI answers on the server. Hosting providers may keep limited operational request logs. Do not submit private or sensitive material.
 

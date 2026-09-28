@@ -37,6 +37,10 @@ document.addEventListener('paste', event => {
 });
 
 async function act(kind: 'explain' | 'remix') {
+  if (!element<HTMLInputElement>('aiConsent').checked) {
+    result.textContent = 'Agree to send your selected content for AI processing first.';
+    return;
+  }
   const buttons = [element<HTMLButtonElement>('explain'), element<HTMLButtonElement>('remix')];
   buttons.forEach(button => button.disabled = true);
   favoriteButton.disabled = false; favoriteButton.textContent = 'Save to favorites';

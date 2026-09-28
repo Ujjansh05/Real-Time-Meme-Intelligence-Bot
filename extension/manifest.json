@@ -2,10 +2,10 @@
   "manifest_version": 3,
   "name": "Humour Hub",
   "version": "2.0.0",
-  "description": "Explain, remix, create, and save memes.",
+  "description": "Explain or remix memes with AI, edit original templates, and save your creations locally.",
   "permissions": ["contextMenus", "storage"],
   "optional_host_permissions": ["https://*/*", "http://127.0.0.1/*", "http://localhost/*"],
-  "action": { "default_popup": "popup.html", "default_icon": "icon.png" },
-  "icons": { "16": "icon.png", "48": "icon.png", "128": "icon.png" },
+  "action": { "default_popup": "popup.html", "default_icon": "icon-48.png" },
+  "icons": { "16": "icon-16.png", "48": "icon-48.png", "128": "icon-128.png" },
   "background": { "service_worker": "background.js", "type": "module" }
 }

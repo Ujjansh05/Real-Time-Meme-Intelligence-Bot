@@ -4,7 +4,7 @@ Humour Hub is a free, open-source Chrome and Edge extension for understanding an
 
 ## Install
 
-For a public release, download the extension ZIP from the project's GitHub Actions artifact or Releases page. Extract it, open `chrome://extensions/` or `edge://extensions/`, enable Developer mode, and choose **Load unpacked** on the extracted folder. The ZIP must contain `manifest.json` at its top level. The same package can be submitted to Microsoft Edge Add-ons. Chrome Web Store publication requires a developer account and a separate store submission.
+Public store links will be added here after approval. For a developer preview, download the production extension ZIP from a GitHub Release, extract it, open `chrome://extensions/` or `edge://extensions/`, enable Developer mode, and choose **Load unpacked** on the extracted folder. The ZIP must contain `manifest.json` at its top level. The local preview ZIP in `artifacts/` points to `127.0.0.1` and is only for testing on the developer's computer. See the [store submission guide](docs/STORE_SUBMISSION.md) for release steps and listing copy.
 
 The extension's popup handles quick explanations and remixes. Open the full editor from the popup to compose images, keep drafts, and browse source-labeled trends. Only content you explicitly submit for AI is sent to the hosted API. [Privacy notice](PRIVACY.md).
 

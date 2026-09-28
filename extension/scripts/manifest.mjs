@@ -12,4 +12,6 @@ if (url.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(url.hostnam
 }
 manifest.host_permissions = [`${url.protocol}//${url.hostname}/*`];
 await writeFile(resolve(root, 'dist', 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-await copyFile(resolve(root, 'icon.png'), resolve(root, 'dist', 'icon.png'));
+for (const size of [16, 48, 128]) {
+  await copyFile(resolve(root, `icon-${size}.png`), resolve(root, 'dist', `icon-${size}.png`));
+}
