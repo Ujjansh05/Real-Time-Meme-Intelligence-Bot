@@ -105,6 +105,42 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()["sources"]), 3)
 
+    async def test_busy_local_model_does_not_spend_quota(self):
+        local = Settings(ai_provider="ollama", quota_backend="memory", session_secret="local-test-key")
+        token = quota.create_session(local)
+        await api._ollama_slot.acquire()
+        try:
+            with patch.object(api, "settings", local), patch.object(api, "OLLAMA_QUEUE_WAIT_SECONDS", 0.01), patch.object(api.ai, "is_available", new_callable=AsyncMock, return_value=True), patch.object(api.quota, "reserve_call", new_callable=AsyncMock) as reserve:
+                response = await self.client.post("/api/v1/explain", headers={"Authorization": f"Bearer {token}"}, json={"text": "busy meme"})
+            self.assertEqual(response.status_code, 503)
+            self.assertEqual(response.json()["error"]["code"], "ai_busy")
+            reserve.assert_not_awaited()
+        finally:
+            api._ollama_slot.release()
+
+    async def test_local_model_uses_memory_quota_through_api(self):
+        local = Settings(ai_provider="ollama", quota_backend="memory", session_secret="local-integration-key")
+        quota._memory_counts.clear()
+
+        def ollama(request):
+            if request.url.path == "/api/tags":
+                return httpx.Response(200, json={"models": [{"name": "qwen2.5vl:3b"}]})
+            return httpx.Response(200, json={"message": {"role": "assistant", "content": "A joke about exams."}})
+
+        real_client = httpx.AsyncClient
+        transport = httpx.MockTransport(ollama)
+        with patch.object(api, "settings", local), patch.object(api.ai.httpx, "AsyncClient", side_effect=lambda **kwargs: real_client(transport=transport)):
+            status = await self.client.get("/api/v1/status")
+            session = await self.client.post("/api/v1/session")
+            token = session.json()["token"]
+            response = await self.client.post("/api/v1/explain", headers={"Authorization": f"Bearer {token}"}, json={"text": "exam meme"})
+        self.assertEqual(status.status_code, 200)
+        self.assertEqual(status.json()["ai_provider"], "ollama")
+        self.assertTrue(status.json()["ai_available"])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["explanation"], "A joke about exams.")
+        self.assertEqual(response.json()["quota"]["remaining"], 4)
+
 
 if __name__ == "__main__":
     unittest.main()

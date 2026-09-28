@@ -3,7 +3,7 @@ export type Quota = { remaining: number; reset_at: string };
 export type TrendItem = { title: string; url: string; score: number; score_label?: string; observed_at?: string; source?: string };
 export type TrendSource = { source: string; label: string; observed_at?: string; stale: boolean; status: 'ok' | 'insufficient_data' | 'unavailable' | 'stale'; items: TrendItem[] };
 export type Trends = { sources: TrendSource[]; generated_at?: string };
-export type Status = { status: string; ai_available: boolean; quota_available: boolean };
+export type Status = { status: string; ai_provider?: 'cloudflare' | 'ollama'; ai_available: boolean; quota_available: boolean };
 
 const defaultBase = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 let token: string | undefined;
@@ -42,7 +42,7 @@ async function request(path: string, init: RequestInit = {}, authenticated = fal
     headers.set('Authorization', `Bearer ${token}`);
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timeout = setTimeout(() => controller.abort(), authenticated ? 150000 : 25000);
   try {
     const response = await fetch(`${base}${path}`, { ...init, headers, signal: controller.signal });
     const data = await response.json().catch(() => null);

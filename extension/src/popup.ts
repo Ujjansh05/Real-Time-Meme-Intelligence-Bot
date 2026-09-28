@@ -76,6 +76,6 @@ function openWorkspace(fragment = 'explain') { void chrome.tabs.create({ url: ch
 element('openWorkspace').addEventListener('click', () => openWorkspace());
 element('openEditor').addEventListener('click', () => openWorkspace('editor'));
 Promise.all([status(), session()]).then(([state, quota]) => {
-  element('status').textContent = state.ai_available && state.quota_available ? 'AI service ready' : 'AI temporarily unavailable · editor still works';
+  element('status').textContent = state.ai_available && state.quota_available ? `AI service ready · ${state.ai_provider === 'ollama' ? 'local model' : state.ai_provider === 'cloudflare' ? 'Cloudflare' : 'configured provider'}` : 'AI temporarily unavailable · editor still works';
   quotaLabel(quota);
 }).catch(() => { element('status').textContent = 'Service unavailable · editor still works'; });

@@ -1,6 +1,6 @@
 # Deploying Humour Hub's free public beta
 
-The extension runs locally in the browser. AI and trend data come from the backend. The following owner accounts are required: Render, Cloudflare, Upstash, and a GitHub repository with Actions enabled. Use free service plans and leave paid upgrades disabled to honor the ₹0 budget.
+The extension runs locally in the browser. AI and trend data come from the backend. This guide covers the Cloudflare Workers AI and Render option, which needs Render, Cloudflare, Upstash, and a GitHub repository with Actions enabled. For AI on your own Windows computer, follow [LOCAL_AI.md](LOCAL_AI.md). Use free service plans and leave paid upgrades disabled to honor the ₹0 budget.
 
 ## 1. Secure the repository
 
@@ -14,7 +14,7 @@ Create an Upstash Redis Free database. Copy its HTTPS REST URL and REST token. Q
 
 ## 3. Deploy FastAPI on Render Free
 
-Use the included [`render.yaml`](../render.yaml) Blueprint or create a Python web service from this repository, with root directory `Backend`, build command `pip install -r requirements.txt`, and start command `uvicorn app:app --host 0.0.0.0 --port $PORT --no-access-log`. Use Python 3.12. Set the variables from [`Backend/.env.example`](../Backend/.env.example) in Render's environment panel. Supply Cloudflare and Upstash values; the Blueprint generates a session secret. Set `TRUST_PROXY_HEADERS=true` only on the public Render web service, where Render overwrites `CF-Connecting-IP`; this lets the per-network quota distinguish visitors. Set `AI_DISABLED=true` until the service is verified, then switch it to `false`.
+Use the included [`render.yaml`](../render.yaml) Blueprint or create a Python web service from this repository, with root directory `Backend`, build command `pip install -r requirements.txt`, and start command `uvicorn app:app --host 0.0.0.0 --port $PORT --no-access-log`. Use Python 3.12. Set the variables from [`Backend/.env.example`](../Backend/.env.example) in Render's environment panel. Keep `AI_PROVIDER=cloudflare` and `QUOTA_BACKEND=upstash`. Supply Cloudflare and Upstash values; the Blueprint generates a session secret. Set `TRUST_PROXY_HEADERS=true` only on the public Render web service, where Render overwrites `CF-Connecting-IP`; this lets the per-network quota distinguish visitors. Set `AI_DISABLED=true` until the service is verified, then switch it to `false`.
 
 Use `GET /api/v1/status` and `GET /api/v1/trends` as smoke checks. The Render free service sleeps when idle and its filesystem is temporary, so requests can be slow after inactivity. The API never relies on persistent local files.
 
@@ -28,7 +28,7 @@ For Bluesky, create a dedicated service account and app password. Add secrets `B
 
 ## 5. Package and distribute
 
-Set the repository Actions variable `HUMOUR_HUB_API_URL` to the Render HTTPS origin, without a trailing slash. The CI workflow then builds a Manifest V3 extension with that URL and publishes a versioned ZIP and SHA-256 checksum as workflow artifacts. Download the ZIP, extract it, and test it in clean Chrome and Edge profiles before attaching it to a GitHub Release or submitting it to Microsoft Edge Add-ons.
+Set the repository Actions variable `HUMOUR_HUB_API_URL` to the public HTTPS origin, without a trailing slash. The CI workflow then builds a Manifest V3 extension with that URL and publishes a versioned ZIP and SHA-256 checksum as workflow artifacts. Download the ZIP, extract it, and test it in clean Chrome and Edge profiles before attaching it to a GitHub Release or submitting it to Microsoft Edge Add-ons.
 
 Store publication needs owner-operated accounts and store review. Edge developer enrollment currently has no registration fee; Chrome Web Store enrollment has a one-time fee. A Chrome ZIP is still freely downloadable but requires Load unpacked installation.
 

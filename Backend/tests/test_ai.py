@@ -18,6 +18,28 @@ SETTINGS = Settings(cloudflare_account_id="account", cloudflare_api_token="serve
 
 
 class ProviderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_ollama_vision_request_and_model_status(self):
+        settings = Settings(ai_provider="ollama", ollama_base_url="http://127.0.0.1:11434", ollama_model="qwen2.5vl:3b")
+        captured = {}
+
+        def handler(request):
+            if request.url.path == "/api/tags":
+                return httpx.Response(200, json={"models": [{"name": "qwen2.5vl:3b"}]})
+            captured["url"] = str(request.url)
+            captured["payload"] = json.loads(request.content)
+            return httpx.Response(200, json={"message": {"role": "assistant", "content": "A joke about contrast."}})
+
+        real_client = httpx.AsyncClient
+        transport = httpx.MockTransport(handler)
+        with patch.object(ai.httpx, "AsyncClient", side_effect=lambda **kwargs: real_client(transport=transport)):
+            self.assertTrue(await ai.is_available(settings))
+            output = await ai.explain(settings, "", "english", b"jpeg-bytes")
+        self.assertEqual(output, "A joke about contrast.")
+        self.assertEqual(captured["url"], "http://127.0.0.1:11434/api/chat")
+        self.assertEqual(captured["payload"]["model"], "qwen2.5vl:3b")
+        self.assertFalse(captured["payload"]["stream"])
+        self.assertEqual(captured["payload"]["messages"][1]["images"], [base64.b64encode(b"jpeg-bytes").decode()])
+
     async def test_vision_request_uses_documented_image_shape(self):
         captured = {}
 

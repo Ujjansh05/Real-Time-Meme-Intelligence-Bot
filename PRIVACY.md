@@ -4,9 +4,9 @@ Humour Hub is a browser extension for explaining and making memes. This notice d
 
 ## Content you choose to submit
 
-The extension sends text or an image to the Humour Hub API only after you check the AI consent box and request an explanation or remix. The API forwards that content to Cloudflare Workers AI to produce the answer. The extension does not read your browsing history or automatically upload images from pages. A right-click action can place selected page text into the extension for your review; it is not sent to AI automatically. Review Cloudflare's [Workers AI data usage policy](https://developers.cloudflare.com/workers-ai/platform/data-usage/) for its processing terms.
+The extension sends text or an image to the Humour Hub API only after you check the AI consent box and request an explanation or remix. The API uses the provider configured by its operator: Cloudflare Workers AI or Ollama running on the operator's own computer. The `/api/v1/status` response identifies the active provider. With Ollama, meme content reaches the operator's computer through the public API but is not forwarded to Cloudflare Workers AI. The extension does not read your browsing history or automatically upload images from pages. A right-click action can place selected page text into the extension for your review; it is not sent to AI automatically. If Cloudflare Workers AI is configured, review its [data usage policy](https://developers.cloudflare.com/workers-ai/platform/data-usage/) for processing terms.
 
-The API processes uploads in memory. It does not intentionally save submitted text, images, or AI answers on the server. Hosting providers may keep limited operational request logs. Do not submit private or sensitive material.
+The API processes uploads in memory. It does not intentionally save submitted text, images, or AI answers on the server. A public deployment may use an HTTPS tunnel or relay, such as Tailscale Funnel or Cloudflare Tunnel, to carry requests to the API. Hosting and relay providers may keep limited operational request logs. Do not submit private or sensitive material.
 
 ## Data stored on your device
 
@@ -14,7 +14,7 @@ Drafts, favorite results, recent results, and imported images remain in this bro
 
 ## Guest access and limits
 
-The API issues an anonymous session token. To enforce fair use, it temporarily stores a token identifier, request counts, and a short-lived network address identifier in Redis. These records expire automatically. The extension does not require a name or email address. There is no advertising tracker or analytics SDK in the extension.
+The API issues an anonymous session token. Public deployments use Redis to store short-lived keyed identifiers and request counts for fair-use limits; these records expire automatically. A local-only test can use process memory instead, which clears on restart. The extension does not require a name or email address. There is no advertising tracker or analytics SDK in the extension.
 
 ## Live trends
 

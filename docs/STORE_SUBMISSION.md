@@ -17,7 +17,7 @@ This is the submission copy for the public Chrome and Microsoft Edge extension. 
 
 Humour Hub helps you understand a meme and make your own. Paste a caption or choose an image to request an AI explanation or three remixes in English, Hindi, or Hinglish. Choose an original template or upload an image, position captions in the editor, and download a PNG. Keep drafts, history, and favorites in your browser. Discovery cards show source links and observation times when trend data is available.
 
-AI processing is optional and has a small daily free allowance. The editor, downloads, and local library work without AI. Only text or images you choose to submit are sent to the Humour Hub API and Cloudflare Workers AI, after you check the consent box. Humour Hub does not require an account, read browsing history, run ads, or use an analytics SDK. See the privacy policy for details.
+AI processing is optional and has a small daily free allowance. The editor, downloads, and local library work without AI. Only text or images you choose to submit are sent to the Humour Hub API for AI processing, after you check the consent box. The API uses Cloudflare Workers AI or a locally hosted Ollama model, depending on the operator's deployment. Humour Hub does not require an account, read browsing history, run ads, or use an analytics SDK. See the privacy policy for details.
 
 ### Permission explanations
 
@@ -29,7 +29,7 @@ AI processing is optional and has a small daily free allowance. The editor, down
 
 ### User data disclosure
 
-For an AI request, the user-selected text or image is sent to the Humour Hub API and forwarded to Cloudflare Workers AI. Images and answers are not intentionally stored on the API server. Anonymous session and short-lived network identifiers are used in Upstash Redis for daily quotas. Drafts, favorites, history, and imported images stay in the browser's local storage unless the user exports them. Public trend data comes from cited sources. There are no ads or analytics SDKs. Refer to `PRIVACY.md` for the full notice and confirm these statements against the live deployment before submitting store privacy forms.
+For an AI request, the user-selected text or image is sent to the Humour Hub API. If the deployed provider is Cloudflare, the API forwards content to Cloudflare Workers AI. If the provider is Ollama, the model processes it on the operator's computer. Images and answers are not intentionally stored on the API server. Anonymous session and short-lived keyed network identifiers are used in Upstash Redis for public daily quotas. Drafts, favorites, history, and imported images stay in the browser's local storage unless the user exports them. Public trend data comes from cited sources. There are no ads or analytics SDKs. Refer to `PRIVACY.md` for the full notice and confirm the active provider and statements against the live deployment before submitting store privacy forms.
 
 ### Reviewer test instructions
 

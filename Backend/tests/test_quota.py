@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 import sys
 import unittest
@@ -44,6 +45,22 @@ class QuotaTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(quota, "_command", new_callable=AsyncMock, side_effect=quota.QuotaUnavailable):
             with self.assertRaises(quota.QuotaUnavailable):
                 await quota.reserve_call(self.settings, "installation", "127.0.0.1")
+
+    async def test_memory_quota_is_atomic_and_limited(self):
+        settings = Settings(quota_backend="memory", session_secret="local-test-secret", session_daily_limit=2, ip_daily_limit=2, global_daily_limit=2)
+        quota._memory_counts.clear()
+        token = quota.create_session(settings)
+        identity = quota.verify_session(settings, token)
+        self.assertTrue(await quota.is_available(settings))
+        self.assertEqual((await quota.remaining_quota(settings, identity, "127.0.0.1"))["remaining"], 2)
+        results = await asyncio.gather(
+            quota.reserve_call(settings, identity, "127.0.0.1"),
+            quota.reserve_call(settings, identity, "127.0.0.1"),
+        )
+        self.assertEqual(sorted(result["remaining"] for result in results), [0, 1])
+        with self.assertRaises(quota.QuotaExceeded) as caught:
+            await quota.reserve_call(settings, identity, "127.0.0.1")
+        self.assertEqual(caught.exception.scope, "installation")
 
 
 if __name__ == "__main__":

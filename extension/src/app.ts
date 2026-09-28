@@ -329,7 +329,7 @@ el('saveApiBase').addEventListener('click', async () => {
 async function checkService() {
   try {
     const [state, quota] = await Promise.all([status(), session()]);
-    el('serviceStatus').textContent = state.ai_available && state.quota_available ? 'AI service ready.' : 'AI is temporarily unavailable. The editor and library still work.';
+    el('serviceStatus').textContent = state.ai_available && state.quota_available ? `AI service ready (${state.ai_provider === 'ollama' ? 'local model' : state.ai_provider === 'cloudflare' ? 'Cloudflare' : 'configured provider'}).` : 'AI is temporarily unavailable. The editor and library still work.';
     quotaLabel(quota);
   } catch (error) { el('serviceStatus').textContent = `Service unavailable: ${message(error)} The editor and library still work.`; }
 }

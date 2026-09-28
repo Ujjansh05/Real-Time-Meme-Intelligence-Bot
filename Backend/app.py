@@ -41,6 +41,8 @@ app.add_middleware(
 
 _trends_cache: tuple[float, dict] | None = None
 _trends_lock = asyncio.Lock()
+_ollama_slot = asyncio.Semaphore(1)
+OLLAMA_QUEUE_WAIT_SECONDS = 5.0
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
@@ -138,12 +140,21 @@ async def _reserve(request: Request, *, legacy: bool = False) -> dict[str, Any]:
 
 
 async def _perform(request: Request, task: str, *, legacy: bool = False, supplied_text: str | None = None) -> dict | JSONResponse:
+    ollama_slot_acquired = False
     try:
         if supplied_text is None:
             text, language, tone, topic, image = await _input(request)
         else:
             text = validate_text(supplied_text, required=True)
             language, tone, topic, image = "english", "student", "", None
+        if settings.ai_provider == "ollama":
+            if not await ai.is_available(settings):
+                raise ai.AIUnavailable()
+            try:
+                await asyncio.wait_for(_ollama_slot.acquire(), timeout=OLLAMA_QUEUE_WAIT_SECONDS)
+            except asyncio.TimeoutError:
+                return _error(503, "ai_busy", "The local AI is busy. Try again shortly.")
+            ollama_slot_acquired = True
         allowed = await _reserve(request, legacy=legacy)
         if task == "explain":
             return {"explanation": await ai.explain(settings, text, language, image), "quota": allowed}
@@ -161,6 +172,9 @@ async def _perform(request: Request, task: str, *, legacy: bool = False, supplie
         return _error(503, "ai_unavailable", "AI is not available right now. Local editing still works.")
     except ai.AIProviderError:
         return _error(502, "provider_error", "The AI provider could not complete this request. Try again later.")
+    finally:
+        if ollama_slot_acquired:
+            _ollama_slot.release()
 
 
 @app.get("/")
@@ -173,7 +187,8 @@ async def status() -> dict:
     quota_available = await quota.is_available(settings)
     return {
         "status": "ok",
-        "ai_available": settings.ai_configured and quota_available,
+        "ai_provider": settings.ai_provider,
+        "ai_available": await ai.is_available(settings) and quota_available,
         "quota_available": quota_available,
         "quota_reset_at": quota.reset_at().isoformat(),
     }

@@ -10,6 +10,10 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.4
+      - key: AI_PROVIDER
+        value: cloudflare
+      - key: QUOTA_BACKEND
+        value: upstash
       - key: CLOUDFLARE_ACCOUNT_ID
         sync: false
       - key: CLOUDFLARE_API_TOKEN

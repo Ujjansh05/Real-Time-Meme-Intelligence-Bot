@@ -1,6 +1,6 @@
 # Humour Hub
 
-Humour Hub is a free, open-source Chrome and Edge extension for understanding and creating memes. Explain a caption or image, ask for three remixes in English, Hindi, or Hinglish, edit a meme, and download it as a PNG. Drafts and favorites stay in your browser. The AI features use a hosted API with a daily public beta allowance.
+Humour Hub is a free, open-source Chrome and Edge extension for understanding and creating memes. Explain a caption or image, ask for three remixes in English, Hindi, or Hinglish, edit a meme, and download it as a PNG. Drafts and favorites stay in your browser. The AI features use a hosted API with a daily public beta allowance. The API can use Cloudflare Workers AI or a local Ollama model.
 
 ## Install
 
@@ -29,13 +29,13 @@ npm ci
 npm run build
 ```
 
-Load `extension/dist` as an unpacked extension. Without service credentials, editing and saved content work locally, while the API reports that AI is unavailable. `Backend/.env.example` lists the deployment settings; set them in the process environment or your hosting dashboard. The backend does not require users to supply API keys.
+Load `extension/dist` as an unpacked extension. Without a configured AI provider, editing and saved content work locally, while the API reports that AI is unavailable. `Backend/.env.example` lists the deployment settings; set them in the process environment or your hosting dashboard. The backend does not require users to supply API keys. For Windows and Ollama, follow the [local AI guide](docs/LOCAL_AI.md).
 
 To build against a deployed API, set `VITE_API_BASE_URL` to its HTTPS origin before `npm run build`. This adds the matching host permission to the manifest. The CI ZIP artifact is created only when the repository variable `HUMOUR_HUB_API_URL` is set.
 
 ## Hosted services and limits
 
-The public beta uses FastAPI, Cloudflare Workers AI, and Upstash Redis. Set a Cloudflare account ID and API token, Upstash REST URL and token, a random session signing secret, and the production extension origin in the backend environment. The server enforces daily limits of five AI actions per installation, twenty per network address, and one hundred across the service. Provider free-tier exhaustion may stop requests earlier. The meme editor and local library continue to work.
+The public beta uses FastAPI, an AI provider, and Upstash Redis. The AI provider can be Cloudflare Workers AI or Ollama on the operator's own computer. Public deployments need an Upstash REST URL and token, a random session signing secret, and a stable HTTPS origin for the extension. The default daily limits are five AI actions per installation, twenty per network address, and one hundred across the service; operators can set these limits through environment variables. Provider capacity may stop requests earlier. The meme editor and local library continue to work.
 
 Cloudflare's Llama 3.2 Vision model requires the deployer to review and accept its license before the first image request. See [third-party notices](THIRD_PARTY_NOTICES.md). Do not enable a paid plan to maintain the intended ₹0 operating budget.
 

@@ -1,5 +1,6 @@
-"""Anonymous signed sessions and atomic daily quotas in Upstash Redis."""
+"""Anonymous sessions with Upstash quotas or single-process local quotas."""
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 import base64
 import hashlib
@@ -23,6 +24,11 @@ class QuotaExceeded(Exception):
 
 class InvalidSession(Exception):
     pass
+
+
+_memory_lock = asyncio.Lock()
+_memory_counts: dict[str, int] = {}
+_memory_day = ""
 
 
 def reset_at() -> datetime:
@@ -87,6 +93,8 @@ async def _command(settings: Settings, command: list) -> object:
 
 
 async def is_available(settings: Settings) -> bool:
+    if settings.quota_backend == "memory":
+        return settings.quota_configured
     try:
         return await _command(settings, ["PING"]) == "PONG"
     except QuotaUnavailable:
@@ -94,6 +102,14 @@ async def is_available(settings: Settings) -> bool:
 
 
 async def remaining_quota(settings: Settings, identity: str, ip: str) -> dict:
+    if settings.quota_backend == "memory":
+        if not settings.quota_configured:
+            raise QuotaUnavailable()
+        async with _memory_lock:
+            day = datetime.now(timezone.utc).strftime("%Y%m%d")
+            counts = _memory_values(settings, identity, ip, day)
+            limits = (settings.session_daily_limit, settings.ip_daily_limit, settings.global_daily_limit)
+            return {"remaining": max(0, min(limit - count for limit, count in zip(limits, counts))), "reset_at": reset_at().isoformat()}
     counts = await _command(settings, ["MGET", *_keys(settings, identity, ip, datetime.now(timezone.utc).strftime("%Y%m%d"))])
     try:
         if not isinstance(counts, list) or len(counts) != 3:
@@ -102,6 +118,14 @@ async def remaining_quota(settings: Settings, identity: str, ip: str) -> dict:
         return {"remaining": max(0, min(balances)), "reset_at": reset_at().isoformat()}
     except (ValueError, TypeError) as exc:
         raise QuotaUnavailable() from exc
+
+
+def _memory_values(settings: Settings, identity: str, ip: str, day: str) -> list[int]:
+    global _memory_day
+    if day != _memory_day:
+        _memory_counts.clear()
+        _memory_day = day
+    return [_memory_counts.get(key, 0) for key in _keys(settings, identity, ip, day)]
 
 
 LUA_RESERVE = """
@@ -122,6 +146,17 @@ return {1, 0, limits[1] - tonumber(redis.call('GET', KEYS[1]))}
 async def reserve_call(settings: Settings, identity: str, ip: str) -> dict:
     if not settings.quota_configured:
         raise QuotaUnavailable()
+    if settings.quota_backend == "memory":
+        async with _memory_lock:
+            day = datetime.now(timezone.utc).strftime("%Y%m%d")
+            counts = _memory_values(settings, identity, ip, day)
+            limits = (settings.session_daily_limit, settings.ip_daily_limit, settings.global_daily_limit)
+            for count, limit, scope in zip(counts, limits, ("installation", "network", "service")):
+                if count >= limit:
+                    raise QuotaExceeded(scope)
+            for key in _keys(settings, identity, ip, day):
+                _memory_counts[key] = _memory_counts.get(key, 0) + 1
+            return {"remaining": settings.session_daily_limit - counts[0] - 1, "reset_at": reset_at().isoformat()}
     now = datetime.now(timezone.utc)
     reset = reset_at()
     day = now.strftime("%Y%m%d")
